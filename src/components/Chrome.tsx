@@ -77,7 +77,7 @@ export function Sidebar({ route, folderId }: { route: string[]; folderId: string
   return (
     <aside className="sidebar">
       <a className="brand" href="#/">
-        <img src="/icon.svg" alt="" width={30} height={30} /> Gig
+        <img src="icon.svg" alt="" width={30} height={30} /> Gig
       </a>
       <NewMenu folderId={folderId} />
       <nav className="nav">
@@ -99,7 +99,7 @@ export function TopBar({ query, onQuery, folderId }: { query: string; onQuery: (
   return (
     <header className="topbar">
       <a className="brand mobile-only" href="#/" onClick={() => go('/')}>
-        <img src="/icon.svg" alt="" width={28} height={28} />
+        <img src="icon.svg" alt="" width={28} height={28} />
       </a>
       <label className="search">
         <Icon name="search" size={18} />
