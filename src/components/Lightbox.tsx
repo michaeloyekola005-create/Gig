@@ -29,7 +29,7 @@ export function Lightbox({ items, start, onClose }: { items: Item[]; start: numb
   if (!item) return null;
 
   let body: React.ReactNode;
-  if (item.kind === 'image') body = <img src={full ?? thumb ?? undefined} alt={item.caption || item.name} />;
+  if (item.kind === 'image') body = <img src={full ?? thumb ?? undefined} alt={item.name} />;
   else if (item.kind === 'video') body = full && <video src={full} controls autoPlay playsInline poster={thumb ?? undefined} />;
   else if (item.kind === 'pdf') body = full && <iframe src={full} title={item.name} />;
   else
@@ -71,7 +71,7 @@ export function Lightbox({ items, start, onClose }: { items: Item[]; start: numb
       <div className="lb-stage" onClick={(e) => e.stopPropagation()}>
         {body}
       </div>
-      {item.caption && <div className="lb-caption">{item.caption}</div>}
+      <div className="lb-caption">{item.name}</div>
       {items.length > 1 && (
         <>
           <button

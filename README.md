@@ -1,30 +1,31 @@
 # Gig
 
-**Drop your designs in. Get a portfolio out.**
+**Like Google Drive, but your work actually looks good.**
 
-Google Drive shows your work as a white list of filenames. Gig takes the same
-drag-and-drop upload and turns it into something you'd actually show a client.
+Gig works like Drive (folders, uploads, search), with three changes for designers
+and freelancers:
 
-## What it does
+1. **Easy arranging.** Drag files and folders into the order you want. Drop a file onto a
+   folder (or onto a breadcrumb) to move it. Each folder remembers its own layout:
+   **Grid**, **Masonry**, **Large** or **List**.
+2. **A clean, visual UI.** Real previews instead of a list of file names. Each tile shows
+   its own main colour while it loads, so nothing flashes white.
+3. **Colour themes, all cool-toned.** Glacier, Lagoon, Mint, Lavender, Mist, and dark
+   Midnight, Deep Sea and Aurora. Pick one with the palette button; it's remembered.
 
-- **Upload like Drive.** Drag files or whole folders anywhere on the page, click
-  Upload, or paste screenshots with Ctrl/⌘ V. Each dropped folder becomes its own project.
-- **Arranged for you.** Images and videos are laid out automatically in
-  **Masonry**, **Grid** or **Showcase** (one big piece per row). Each tile shows
-  its own main colour while loading, so the page never flashes white.
-- **Presentable in one click.** *Present* turns a project into a clean case-study
-  page with title, client, tags and a short write-up. *Slideshow* goes full screen
-  (arrow keys, or swipe on a phone).
-- **Share without an account.** *Export website* downloads one `.html` file with every
-  image inside it. Email it, or put it on Netlify, Vercel or GitHub Pages.
-- **Organise lightly.** Drag to reorder, ★ to pick the cover, add captions, search
-  by project, client or tag.
-- **Installable and offline.** It's a PWA: on a phone, "Add to Home Screen" and it
-  opens like an app. Files are stored on the device (IndexedDB); nothing is uploaded
-  to a server.
+## Features
 
-Images, video and PDFs get previews. Other files (`.fig`, `.psd`, `.ai`, `.zip`…) are
-kept and shown as clean file cards you can download.
+- **Upload like Drive.** Use **New → Upload files / Upload folder / New folder**, drag files
+  or whole folders anywhere on the page, or paste screenshots with Ctrl/⌘ V. Dropped folders
+  keep their sub-folders.
+- **Folders** show a preview of what's inside. Star a file to make it the folder's cover.
+- **Preview** images, video and PDFs full screen (arrow keys, or swipe on a phone).
+  Other files (`.fig`, `.psd`, `.ai`, `.zip`…) are stored and downloadable.
+- **Search** across all folders, plus a **Recent** view.
+- **Share as a page**: downloads one `.html` file of the folder, in your theme, that anyone
+  can open in a browser.
+- **Installable and offline**: it's a PWA ("Add to Home Screen" on a phone). Files are stored
+  on the device (IndexedDB). Nothing is uploaded to a server yet.
 
 ## Run it
 
@@ -41,9 +42,11 @@ npm run preview   # serve the build (enables offline/PWA)
 
 | Path | What's there |
 | --- | --- |
-| `src/db.ts` | IndexedDB storage for projects, items, original files and thumbnails |
-| `src/media.ts` | Reads each file: size, thumbnail, main colour, video poster frame |
-| `src/drop.ts` | Turns a drag-and-drop into files, one group per folder |
-| `src/layout.ts` | Masonry layout that keeps left-to-right reading order |
-| `src/export.ts` | Builds the single-file portfolio website |
-| `src/components/` | Library, project editor/present view, gallery, lightbox |
+| `src/db.ts` | IndexedDB storage: nested folders, files, thumbnails, moves, migrations |
+| `src/media.ts` | Reads each upload: dimensions, thumbnail, main colour, video poster frame |
+| `src/drop.ts` | Turns a drag-and-drop or folder upload into files with their folder paths |
+| `src/actions.ts` | Create folders; upload while recreating dropped folder structure |
+| `src/layout.ts` | Masonry and drag-to-reorder helpers |
+| `src/theme.ts` | The cool-tone colour themes |
+| `src/export.ts` | "Share as a page" single-file export |
+| `src/components/` | Sidebar/top bar, folder view, folder cards, file gallery, preview, dialogs |

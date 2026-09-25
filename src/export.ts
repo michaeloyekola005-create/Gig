@@ -1,74 +1,63 @@
 import { getBlob } from './db';
 import { downscale } from './media';
-import type { Item, Project } from './types';
+import { getTheme } from './theme';
+import type { Folder, Item } from './types';
 import { blobToDataUrl, escapeHtml, formatBytes } from './util';
 
 const IMAGE_KEEP_ORIGINAL = 1.5 * 1024 * 1024;
 const EMBED_LIMIT = 25 * 1024 * 1024;
 
 /**
- * Build a single self-contained HTML page for a project: every image is
- * embedded, so the file can be emailed, dropped on any static host, or opened
- * offline by a client.
+ * Build one self-contained HTML file for a folder: every file is embedded, so
+ * it can be emailed or opened offline and looks the way it does in the app.
  */
-export async function exportProject(p: Project, items: Item[], onProgress?: (n: number, total: number) => void) {
+export async function exportFolder(f: Folder, items: Item[], onProgress?: (n: number, total: number) => void) {
+  const t = getTheme();
   const parts: string[] = [];
   let n = 0;
   for (const it of items) {
     const file = await getBlob('files', it.id);
     onProgress?.(++n, items.length);
     if (!file) continue;
-    const caption = it.caption ? `<figcaption>${escapeHtml(it.caption)}</figcaption>` : '';
+    const name = escapeHtml(it.name);
     const ar = it.width && it.height ? ` style="aspect-ratio:${it.width}/${it.height};background:${it.color}"` : '';
 
     if (it.kind === 'image') {
       const blob =
         file.size > IMAGE_KEEP_ORIGINAL || it.mime === 'image/svg+xml' ? await downscale(file, 2400).catch(() => file) : file;
-      const src = await blobToDataUrl(blob);
-      parts.push(`<figure><img src="${src}" alt="${escapeHtml(it.caption || it.name)}"${ar} loading="lazy">${caption}</figure>`);
+      parts.push(`<figure><img src="${await blobToDataUrl(blob)}" alt="${name}"${ar} loading="lazy"><figcaption>${name}</figcaption></figure>`);
     } else if (it.kind === 'video' && file.size <= EMBED_LIMIT) {
-      parts.push(`<figure><video src="${await blobToDataUrl(file)}" controls playsinline${ar}></video>${caption}</figure>`);
+      parts.push(`<figure><video src="${await blobToDataUrl(file)}" controls playsinline${ar}></video><figcaption>${name}</figcaption></figure>`);
     } else if (file.size <= EMBED_LIMIT) {
       parts.push(
-        `<figure class="file"><a href="${await blobToDataUrl(file)}" download="${escapeHtml(it.name)}"><b>${escapeHtml(
+        `<figure class="file"><a href="${await blobToDataUrl(file)}" download="${name}"><b>${escapeHtml(
           it.name.split('.').pop()?.toUpperCase() ?? 'FILE'
-        )}</b><span>${escapeHtml(it.name)}</span><small>${formatBytes(file.size)} · download</small></a>${caption}</figure>`
+        )}</b><small>${formatBytes(file.size)} · download</small></a><figcaption>${name}</figcaption></figure>`
       );
     }
   }
 
-  const cols = p.layout === 'showcase' ? 1 : 3;
-  const meta = [p.client && `for ${escapeHtml(p.client)}`, ...p.tags.map(escapeHtml)].filter(Boolean).join(' · ');
+  const cols = f.layout === 'large' || f.layout === 'list' ? 1 : 3;
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${escapeHtml(p.title || 'Portfolio')}</title>
-<meta name="description" content="${escapeHtml(p.description.slice(0, 160))}">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<title>${escapeHtml(f.title)}</title>
 <style>
-:root{--bg:#fafaf9;--fg:#18181b;--muted:#71717a;--card:#fff}
-@media(prefers-color-scheme:dark){:root{--bg:#0c0c0d;--fg:#f4f4f5;--muted:#a1a1aa;--card:#18181b}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-header{max-width:1200px;margin:0 auto;padding:96px 24px 48px}
-h1{font-size:clamp(36px,6vw,64px);letter-spacing:-.03em;line-height:1.02;margin:0 0 16px}
-.meta{color:var(--muted);font-size:14px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:24px}
-.desc{font-size:18px;line-height:1.6;max-width:640px;color:var(--muted);white-space:pre-wrap;margin:0}
-main{max-width:1200px;margin:0 auto;padding:0 24px 96px;columns:${cols} 320px;column-gap:20px}
-${p.layout === 'showcase' ? 'main{max-width:1000px}' : ''}
-figure{margin:0 0 20px;break-inside:avoid}
-img,video{display:block;width:100%;height:auto;border-radius:10px;cursor:zoom-in}
-video{cursor:auto}
-figcaption{font-size:14px;color:var(--muted);padding:10px 2px 0}
-.file a{display:flex;flex-direction:column;gap:6px;padding:28px;border-radius:10px;background:var(--card);color:inherit;text-decoration:none;border:1px solid rgba(127,127,127,.2)}
-.file b{font-size:12px;letter-spacing:.1em;color:#f97316}.file small{color:var(--muted)}
-footer{text-align:center;color:var(--muted);font-size:13px;padding:0 0 48px}
-#lb{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:9;cursor:zoom-out}
-#lb.on{display:flex}#lb img{max-width:94vw;max-height:92vh;width:auto;border-radius:4px}
+:root{--bg:${t.bg};--panel:${t.panel};--card:${t.card};--fg:${t.fg};--muted:${t.muted};--line:${t.line};--accent:${t.accent}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:24px auto;padding:28px;background:var(--panel);border-radius:24px}
+h1{font-size:22px;font-weight:600;margin:0 0 4px}.sub{color:var(--muted);font-size:13px;margin:0 0 24px}
+main{columns:${cols} 280px;column-gap:16px}${cols === 1 ? 'main{max-width:960px;margin:0 auto}' : ''}
+figure{margin:0 0 18px;break-inside:avoid}
+img,video{display:block;width:100%;height:auto;border-radius:12px;cursor:zoom-in}video{cursor:auto}
+figcaption{font-size:13px;color:var(--muted);padding:8px 2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file a{display:flex;flex-direction:column;gap:6px;padding:28px;border-radius:12px;background:var(--card);color:inherit;text-decoration:none;border:1px solid var(--line)}
+.file b{font-size:12px;letter-spacing:.1em;color:var(--accent)}.file small{color:var(--muted)}
+#lb{position:fixed;inset:0;background:rgba(6,10,20,.94);display:none;align-items:center;justify-content:center;z-index:9;cursor:zoom-out}
+#lb.on{display:flex}#lb img{max-width:94vw;max-height:92vh;width:auto;border-radius:6px}
+@media(max-width:640px){.wrap{margin:0;border-radius:0;padding:20px 16px}}
 </style></head><body>
-<header><h1>${escapeHtml(p.title || 'Untitled project')}</h1>${meta ? `<div class="meta">${meta}</div>` : ''}${
-    p.description ? `<p class="desc">${escapeHtml(p.description)}</p>` : ''
-  }</header>
-<main>${parts.join('\n')}</main>
-<footer>Made with Gig</footer>
+<div class="wrap"><h1>${escapeHtml(f.title)}</h1><p class="sub">${items.length} file${items.length === 1 ? '' : 's'}</p>
+<main>${parts.join('\n')}</main></div>
 <div id="lb"><img alt=""></div>
 <script>
 var lb=document.getElementById('lb'),li=lb.querySelector('img');
@@ -78,10 +67,9 @@ document.onkeydown=function(e){if(e.key==='Escape')lb.classList.remove('on')};
 </script>
 </body></html>`;
 
-  const blob = new Blob([html], { type: 'text/html' });
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${(p.title || 'portfolio').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'portfolio'}.html`;
+  a.href = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+  a.download = `${f.title.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'folder'}.html`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
 }

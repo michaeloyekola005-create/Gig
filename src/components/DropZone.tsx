@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { groupsFromDataTransfer, hasFiles, type DropGroup } from '../drop';
+import { filesFromDataTransfer, fromFileList, hasFiles, type DroppedFile } from '../drop';
+import { Icon } from './Icons';
 
 /** Full-window drop target. Shows an overlay while files are dragged over the page. */
-export function WindowDrop({ label, onDrop }: { label: string; onDrop: (groups: DropGroup[]) => void }) {
+export function WindowDrop({ label, onDrop }: { label: string; onDrop: (files: DroppedFile[]) => void }) {
   const [active, setActive] = useState(false);
   useEffect(() => {
     let depth = 0;
@@ -26,7 +27,7 @@ export function WindowDrop({ label, onDrop }: { label: string; onDrop: (groups: 
       e.preventDefault();
       depth = 0;
       setActive(false);
-      onDrop(await groupsFromDataTransfer(e.dataTransfer));
+      onDrop(await filesFromDataTransfer(e.dataTransfer));
     };
     window.addEventListener('dragenter', enter);
     window.addEventListener('dragleave', leave);
@@ -43,7 +44,9 @@ export function WindowDrop({ label, onDrop }: { label: string; onDrop: (groups: 
   return (
     <div className={`drop-overlay ${active ? 'on' : ''}`} aria-hidden={!active}>
       <div className="drop-card">
-        <div className="drop-icon">↓</div>
+        <span className="drop-icon">
+          <Icon name="upload" size={24} />
+        </span>
         <div>{label}</div>
       </div>
     </div>
@@ -52,10 +55,12 @@ export function WindowDrop({ label, onDrop }: { label: string; onDrop: (groups: 
 
 export function PickFiles({
   onFiles,
-  className = 'btn',
+  folder = false,
+  className,
   children,
 }: {
-  onFiles: (files: File[]) => void;
+  onFiles: (files: DroppedFile[]) => void;
+  folder?: boolean;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -66,9 +71,9 @@ export function PickFiles({
         type="file"
         multiple
         hidden
-        accept="image/*,video/*,application/pdf,.fig,.sketch,.psd,.ai,.xd,.zip"
+        {...(folder ? { webkitdirectory: '' } : {})}
         onChange={(e) => {
-          onFiles(Array.from(e.target.files ?? []));
+          onFiles(fromFileList(Array.from(e.target.files ?? [])));
           e.target.value = '';
         }}
       />

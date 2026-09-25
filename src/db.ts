@@ -1,21 +1,53 @@
-import type { Item, Project } from './types';
+import { ROOT, type Folder, type Item, type Layout } from './types';
 
 // Everything lives in the browser (IndexedDB), so the app works offline and
-// nothing leaves the device unless the user exports it.
-type Store = 'projects' | 'items' | 'files' | 'thumbs';
+// nothing leaves the device unless the user downloads or shares it.
+type Store = 'folders' | 'items' | 'files' | 'thumbs';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
 function open(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open('gig', 1);
-    req.onupgradeneeded = () => {
+    const req = indexedDB.open('gig', 2);
+    req.onupgradeneeded = (e) => {
       const db = req.result;
-      db.createObjectStore('projects', { keyPath: 'id' });
-      db.createObjectStore('items', { keyPath: 'id' }).createIndex('projectId', 'projectId');
-      db.createObjectStore('files');
-      db.createObjectStore('thumbs');
+      const t = req.transaction!;
+      if (e.oldVersion < 1) {
+        db.createObjectStore('files');
+        db.createObjectStore('thumbs');
+        db.createObjectStore('items', { keyPath: 'id' });
+      }
+      db.createObjectStore('folders', { keyPath: 'id' }).createIndex('parentId', 'parentId');
+      const items = t.objectStore('items');
+      items.createIndex('folderId', 'folderId');
+
+      if (e.oldVersion === 1) {
+        // v1 had flat "projects"; each becomes a folder in My Drive.
+        const folders = t.objectStore('folders');
+        const rootOrder: string[] = [];
+        t.objectStore('projects').openCursor().onsuccess = function () {
+          const cur = this.result;
+          if (cur) {
+            const p = cur.value;
+            rootOrder.push(p.id);
+            folders.put({
+              id: p.id, title: p.title, parentId: ROOT, layout: p.layout === 'showcase' ? 'large' : p.layout,
+              coverId: p.coverId, order: p.order, folderOrder: [], createdAt: p.createdAt, updatedAt: p.updatedAt,
+            } satisfies Folder);
+            return cur.continue();
+          }
+          folders.put({ ...newRoot(), folderOrder: rootOrder });
+          db.deleteObjectStore('projects');
+        };
+        items.openCursor().onsuccess = function () {
+          const cur = this.result;
+          if (!cur) return items.deleteIndex('projectId');
+          const { projectId, caption: _c, ...rest } = cur.value;
+          cur.update({ ...rest, folderId: projectId });
+          cur.continue();
+        };
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -41,52 +73,96 @@ async function tx(stores: Store[], mode: IDBTransactionMode, fn: (t: IDBTransact
   });
 }
 
+async function read<T>(store: Store, fn: (s: IDBObjectStore) => IDBRequest): Promise<T> {
+  const db = await open();
+  return wrap(fn(db.transaction(store).objectStore(store)));
+}
+
 // --- change notifications -------------------------------------------------
 const listeners = new Set<() => void>();
 export function subscribe(fn: () => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
-function changed() {
+export function notifyChanged() {
   listeners.forEach((fn) => fn());
 }
 
-// --- projects ---------------------------------------------------------------
-export async function listProjects(): Promise<Project[]> {
-  const db = await open();
-  const all = await wrap(db.transaction('projects').objectStore('projects').getAll());
-  return (all as Project[]).sort((a, b) => b.updatedAt - a.updatedAt);
+// --- folders --------------------------------------------------------------
+function newRoot(): Folder {
+  return {
+    id: ROOT, title: 'My Drive', parentId: null, layout: 'grid', coverId: null,
+    order: [], folderOrder: [], createdAt: 0, updatedAt: 0,
+  };
 }
 
-export async function getProject(id: string): Promise<Project | undefined> {
-  const db = await open();
-  return wrap(db.transaction('projects').objectStore('projects').get(id));
+const LAYOUTS: Layout[] = ['grid', 'masonry', 'large', 'list'];
+
+export async function getFolder(id: string): Promise<Folder | undefined> {
+  const f = await read<Folder | undefined>('folders', (s) => s.get(id));
+  if (!f) return id === ROOT ? newRoot() : undefined;
+  return { ...f, folderOrder: f.folderOrder ?? [], layout: LAYOUTS.includes(f.layout) ? f.layout : 'grid' };
 }
 
-export async function saveProject(p: Project): Promise<void> {
-  await tx(['projects'], 'readwrite', (t) => t.objectStore('projects').put({ ...p, updatedAt: Date.now() }));
-  changed();
+export const listFolders = (parentId: string) =>
+  read<Folder[]>('folders', (s) => s.index('parentId').getAll(parentId));
+export const allFolders = () => read<Folder[]>('folders', (s) => s.getAll());
+
+export async function saveFolder(f: Folder): Promise<void> {
+  await tx(['folders'], 'readwrite', (t) => t.objectStore('folders').put({ ...f, updatedAt: Date.now() }));
+  notifyChanged();
 }
 
-export async function deleteProject(id: string): Promise<void> {
-  const items = await listItems(id);
-  await tx(['projects', 'items', 'files', 'thumbs'], 'readwrite', (t) => {
-    t.objectStore('projects').delete(id);
+/** Ids of a folder and everything nested in it. */
+async function descendants(id: string): Promise<string[]> {
+  const out = [id];
+  for (let i = 0; i < out.length; i++) out.push(...(await listFolders(out[i])).map((f) => f.id));
+  return out;
+}
+
+export async function isInside(folderId: string, ancestorId: string): Promise<boolean> {
+  for (let f = await getFolder(folderId); f; f = f.parentId ? await getFolder(f.parentId) : undefined) {
+    if (f.id === ancestorId) return true;
+  }
+  return false;
+}
+
+export async function deleteFolder(id: string): Promise<void> {
+  const folder = await getFolder(id);
+  const ids = await descendants(id);
+  const items = (await Promise.all(ids.map(listItems))).flat();
+  const parent = folder?.parentId ? await getFolder(folder.parentId) : undefined;
+  await tx(['folders', 'items', 'files', 'thumbs'], 'readwrite', (t) => {
+    for (const f of ids) t.objectStore('folders').delete(f);
     for (const it of items) {
       t.objectStore('items').delete(it.id);
       t.objectStore('files').delete(it.id);
       t.objectStore('thumbs').delete(it.id);
     }
+    if (parent) t.objectStore('folders').put({ ...parent, folderOrder: parent.folderOrder.filter((x) => x !== id) });
   });
-  changed();
+  notifyChanged();
 }
 
-// --- items -----------------------------------------------------------------
-export async function listItems(projectId: string): Promise<Item[]> {
-  const db = await open();
-  const idx = db.transaction('items').objectStore('items').index('projectId');
-  return wrap(idx.getAll(projectId)) as Promise<Item[]>;
+export async function moveFolder(id: string, toId: string): Promise<boolean> {
+  const f = await getFolder(id);
+  if (!f || f.parentId === toId || (await isInside(toId, id))) return false;
+  const from = await getFolder(f.parentId!);
+  const to = await getFolder(toId);
+  if (!from || !to) return false;
+  await tx(['folders'], 'readwrite', (t) => {
+    const s = t.objectStore('folders');
+    s.put({ ...f, parentId: toId });
+    s.put({ ...from, folderOrder: from.folderOrder.filter((x) => x !== id) });
+    s.put({ ...to, folderOrder: [...to.folderOrder, id], updatedAt: Date.now() });
+  });
+  notifyChanged();
+  return true;
 }
+
+// --- items ----------------------------------------------------------------
+export const listItems = (folderId: string) => read<Item[]>('items', (s) => s.index('folderId').getAll(folderId));
+export const allItems = () => read<Item[]>('items', (s) => s.getAll());
 
 export async function addItem(item: Item, file: Blob, thumb: Blob | null): Promise<void> {
   await tx(['items', 'files', 'thumbs'], 'readwrite', (t) => {
@@ -98,7 +174,7 @@ export async function addItem(item: Item, file: Blob, thumb: Blob | null): Promi
 
 export async function saveItem(item: Item): Promise<void> {
   await tx(['items'], 'readwrite', (t) => t.objectStore('items').put(item));
-  changed();
+  notifyChanged();
 }
 
 export async function deleteItem(id: string): Promise<void> {
@@ -107,12 +183,31 @@ export async function deleteItem(id: string): Promise<void> {
     t.objectStore('files').delete(id);
     t.objectStore('thumbs').delete(id);
   });
-  changed();
+  notifyChanged();
+}
+
+export async function moveItem(item: Item, toId: string): Promise<void> {
+  if (item.folderId === toId) return;
+  const from = await getFolder(item.folderId);
+  const to = await getFolder(toId);
+  if (!to) return;
+  await tx(['items', 'folders'], 'readwrite', (t) => {
+    t.objectStore('items').put({ ...item, folderId: toId });
+    const s = t.objectStore('folders');
+    if (from) {
+      s.put({
+        ...from,
+        order: from.order.filter((x) => x !== item.id),
+        coverId: from.coverId === item.id ? null : from.coverId,
+      });
+    }
+    s.put({ ...to, order: [...to.order, item.id], coverId: to.coverId ?? (item.hasThumb ? item.id : null), updatedAt: Date.now() });
+  });
+  notifyChanged();
 }
 
 export async function getBlob(store: 'files' | 'thumbs', id: string): Promise<Blob | undefined> {
-  const db = await open();
-  return wrap(db.transaction(store).objectStore(store).get(id));
+  return read<Blob | undefined>(store, (s) => s.get(id));
 }
 
-export { changed as notifyChanged };
+export const getItem = (id: string) => read<Item | undefined>('items', (s) => s.get(id));

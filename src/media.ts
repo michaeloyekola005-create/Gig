@@ -1,4 +1,4 @@
-import { addItem, getProject, notifyChanged, saveProject } from './db';
+import { addItem, getFolder, notifyChanged, saveFolder } from './db';
 import type { Item, Kind } from './types';
 import { uid } from './util';
 
@@ -80,11 +80,11 @@ export async function downscale(blob: Blob, max: number): Promise<Blob> {
   return (await canvasBlob(toCanvas(img, max), 'image/jpeg', 0.9)) ?? blob;
 }
 
-async function ingestOne(file: File, projectId: string): Promise<Item> {
+async function ingestOne(file: File, folderId: string): Promise<Item> {
   const kind = kindOf(file);
   const item: Item = {
     id: uid(),
-    projectId,
+    folderId,
     name: file.name,
     mime: file.type || 'application/octet-stream',
     kind,
@@ -92,7 +92,7 @@ async function ingestOne(file: File, projectId: string): Promise<Item> {
     width: 0,
     height: 0,
     color: '#e7e5e4',
-    caption: '',
+
     hasThumb: false,
     createdAt: Date.now(),
   };
@@ -114,10 +114,10 @@ async function ingestOne(file: File, projectId: string): Promise<Item> {
   return item;
 }
 
-/** Add files to a project. Runs a few at a time and reports progress. */
+/** Add files to a folder. Runs a few at a time and reports progress. */
 export async function ingestFiles(
   files: File[],
-  projectId: string,
+  folderId: string,
   onProgress?: (done: number, total: number) => void
 ): Promise<void> {
   const accepted = files.filter((f) => !f.name.startsWith('.'));
@@ -126,20 +126,20 @@ export async function ingestFiles(
   const queue = [...accepted];
   const worker = async () => {
     for (let f = queue.shift(); f; f = queue.shift()) {
-      added.push(await ingestOne(f, projectId));
+      added.push(await ingestOne(f, folderId));
       onProgress?.(++done, accepted.length);
     }
   };
   await Promise.all([worker(), worker(), worker()]);
 
-  const p = await getProject(projectId);
+  const p = await getFolder(folderId);
   if (p) {
     // Keep the order the user dropped them in.
     const byName = new Map(accepted.map((f, i) => [f.name + f.size, i]));
     added.sort((a, b) => (byName.get(a.name + a.size) ?? 0) - (byName.get(b.name + b.size) ?? 0));
     p.order = [...p.order, ...added.map((i) => i.id)];
     if (!p.coverId) p.coverId = added.find((i) => i.hasThumb)?.id ?? null;
-    await saveProject(p);
+    await saveFolder(p);
   }
   notifyChanged();
   navigator.storage?.persist?.().catch(() => {});

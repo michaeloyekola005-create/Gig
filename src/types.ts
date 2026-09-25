@@ -1,22 +1,23 @@
-export type Layout = 'masonry' | 'grid' | 'showcase';
+export type Layout = 'grid' | 'masonry' | 'large' | 'list';
 export type Kind = 'image' | 'video' | 'pdf' | 'file';
 
-export interface Project {
+export const ROOT = 'root';
+
+export interface Folder {
   id: string;
   title: string;
-  description: string;
-  client: string;
-  tags: string[];
+  parentId: string | null; // null only for the root ("My Drive")
   layout: Layout;
-  coverId: string | null;
-  order: string[]; // item ids, in display order
+  coverId: string | null; // item shown on the folder's card
+  order: string[]; // file ids, in display order
+  folderOrder: string[]; // sub-folder ids, in display order
   createdAt: number;
   updatedAt: number;
 }
 
 export interface Item {
   id: string;
-  projectId: string;
+  folderId: string;
   name: string;
   mime: string;
   kind: Kind;
@@ -24,7 +25,6 @@ export interface Item {
   width: number; // 0 when unknown
   height: number;
   color: string; // dominant colour, used as a placeholder while loading
-  caption: string;
   hasThumb: boolean;
   createdAt: number;
 }

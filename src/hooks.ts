@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { getBlob, getProject, listItems, listProjects, subscribe } from './db';
-import type { Item, Project } from './types';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { allFolders, allItems, getBlob, getFolder, listFolders, listItems, subscribe } from './db';
+import type { Folder, Item } from './types';
 
 function useDbQuery<T>(query: () => Promise<T>, deps: unknown[]): T | undefined {
   const [value, setValue] = useState<T>();
@@ -18,28 +18,58 @@ function useDbQuery<T>(query: () => Promise<T>, deps: unknown[]): T | undefined 
   return value;
 }
 
-export interface ProjectSummary extends Project {
-  items: Item[];
+function ordered<T extends { id: string; createdAt: number }>(order: string[], list: T[]): T[] {
+  const pos = new Map(order.map((id, i) => [id, i]));
+  return [...list].sort((a, b) => (pos.get(a.id) ?? 1e9) - (pos.get(b.id) ?? 1e9) || a.createdAt - b.createdAt);
 }
 
-export function useProjects(): ProjectSummary[] | undefined {
-  return useDbQuery(async () => {
-    const ps = await listProjects();
-    return Promise.all(ps.map(async (p) => ({ ...p, items: ordered(p, await listItems(p.id)) })));
-  }, []);
+export interface FolderCardData extends Folder {
+  count: number;
+  previews: Item[]; // up to 3 images for the card, cover first
 }
 
-export function useProject(id: string) {
+async function cardData(f: Folder): Promise<FolderCardData> {
+  const [items, subs] = await Promise.all([listItems(f.id), listFolders(f.id)]);
+  const visual = ordered(f.order, items).filter((i) => i.hasThumb);
+  const cover = visual.find((i) => i.id === f.coverId);
+  const previews = (cover ? [cover, ...visual.filter((i) => i !== cover)] : visual).slice(0, 3);
+  return { ...f, count: items.length + subs.length, previews };
+}
+
+export function useFolder(id: string) {
   return useDbQuery(async () => {
-    const p = await getProject(id);
-    if (!p) return null;
-    return { project: p, items: ordered(p, await listItems(id)) };
+    const folder = await getFolder(id);
+    if (!folder) return null;
+    const [subs, items] = await Promise.all([listFolders(id), listItems(id)]);
+    const path: Folder[] = [];
+    for (let f: Folder | undefined = folder; f; f = f.parentId ? await getFolder(f.parentId) : undefined) path.unshift(f);
+    return {
+      folder,
+      path,
+      folders: await Promise.all(ordered(folder.folderOrder, subs).map(cardData)),
+      items: ordered(folder.order, items),
+    };
   }, [id]);
 }
 
-function ordered(p: Project, items: Item[]): Item[] {
-  const pos = new Map(p.order.map((id, i) => [id, i]));
-  return [...items].sort((a, b) => (pos.get(a.id) ?? 1e9) - (pos.get(b.id) ?? 1e9) || a.createdAt - b.createdAt);
+export function useRecent(limit = 60) {
+  return useDbQuery(async () => (await allItems()).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit), [limit]);
+}
+
+export function useSearch(q: string) {
+  return useDbQuery(async () => {
+    const s = q.trim().toLowerCase();
+    if (!s) return null;
+    const [folders, items] = await Promise.all([allFolders(), allItems()]);
+    return {
+      folders: await Promise.all(folders.filter((f) => f.parentId && f.title.toLowerCase().includes(s)).map(cardData)),
+      items: items.filter((i) => i.name.toLowerCase().includes(s)),
+    };
+  }, [q]);
+}
+
+export function useStorageUsed(): number | null {
+  return useDbQuery(async () => (await navigator.storage?.estimate?.())?.usage ?? null, []) ?? null;
 }
 
 const urlCache = new Map<string, Promise<string | null>>();
@@ -96,4 +126,22 @@ export function useElementWidth<T extends HTMLElement>(): [(el: T | null) => voi
     return () => ro.disconnect();
   }, [el]);
   return [setEl, width];
+}
+
+/** Close a popover when clicking outside it or pressing Escape. */
+export function usePopover(): [boolean, (v: boolean) => void, React.RefObject<HTMLDivElement>] {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const click = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', click);
+    document.addEventListener('keydown', key);
+    return () => {
+      document.removeEventListener('mousedown', click);
+      document.removeEventListener('keydown', key);
+    };
+  }, [open]);
+  return [open, setOpen, ref];
 }

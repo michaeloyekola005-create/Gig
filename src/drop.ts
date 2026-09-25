@@ -1,8 +1,7 @@
-// Turn a drop into groups of files. Each dropped folder becomes its own group
-// (so dropping 3 client folders makes 3 projects); loose files share one group.
-export interface DropGroup {
-  name: string | null;
-  files: File[];
+// Collect files from a drop, remembering which (sub)folder each came from.
+export interface DroppedFile {
+  file: File;
+  dirs: string[]; // folder path relative to what was dropped; [] for loose files
 }
 
 type Entry = FileSystemEntry;
@@ -21,33 +20,37 @@ function readAll(dir: FileSystemDirectoryEntry): Promise<Entry[]> {
   });
 }
 
-async function walk(entry: Entry): Promise<File[]> {
+async function walk(entry: Entry, dirs: string[]): Promise<DroppedFile[]> {
   if (entry.isFile) {
-    return new Promise((resolve) => (entry as FileSystemFileEntry).file((f) => resolve([f]), () => resolve([])));
+    return new Promise((resolve) =>
+      (entry as FileSystemFileEntry).file((file) => resolve([{ file, dirs }]), () => resolve([]))
+    );
   }
   if (entry.isDirectory) {
     const children = await readAll(entry as FileSystemDirectoryEntry);
-    return (await Promise.all(children.map(walk))).flat();
+    return (await Promise.all(children.map((c) => walk(c, [...dirs, entry.name])))).flat();
   }
   return [];
 }
 
-export async function groupsFromDataTransfer(dt: DataTransfer): Promise<DropGroup[]> {
+export async function filesFromDataTransfer(dt: DataTransfer): Promise<DroppedFile[]> {
   const entries = Array.from(dt.items)
     .filter((i) => i.kind === 'file')
     .map((i) => i.webkitGetAsEntry?.())
     .filter((e): e is Entry => !!e);
+  if (!entries.length) return fromFileList(Array.from(dt.files));
+  return (await Promise.all(entries.map((e) => walk(e, [])))).flat();
+}
 
-  if (!entries.length) return [{ name: null, files: Array.from(dt.files) }];
-
-  const groups: DropGroup[] = [];
-  const loose: File[] = [];
-  for (const e of entries) {
-    if (e.isDirectory) groups.push({ name: e.name, files: await walk(e) });
-    else loose.push(...(await walk(e)));
-  }
-  if (loose.length) groups.unshift({ name: null, files: loose });
-  return groups.filter((g) => g.files.length);
+/** Files from an <input>; folder uploads carry their path in webkitRelativePath. */
+export function fromFileList(files: File[]): DroppedFile[] {
+  return files.map((file) => ({ file, dirs: (file.webkitRelativePath || '').split('/').slice(0, -1) }));
 }
 
 export const hasFiles = (e: DragEvent | React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files');
+
+// What's being dragged inside the app (a file tile or a folder card).
+export let dragging: { kind: 'item' | 'folder'; id: string } | null = null;
+export const setDragging = (d: typeof dragging) => {
+  dragging = d;
+};

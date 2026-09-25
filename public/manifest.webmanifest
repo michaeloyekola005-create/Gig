@@ -1,11 +1,11 @@
 {
-  "name": "Gig — portfolio drive for freelancers",
+  "name": "Gig — a cleaner drive for freelancers",
   "short_name": "Gig",
-  "description": "Drop your designs in. Get a portfolio out.",
+  "description": "Drive for designers: upload like Drive, arranged and clean.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#fafaf9",
-  "theme_color": "#fafaf9",
+  "background_color": "#e3ecf8",
+  "theme_color": "#e3ecf8",
   "icons": [
     { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
