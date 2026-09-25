@@ -58,13 +58,13 @@ export function FolderView({ id }: { id: string }) {
       <div className="empty-state">
         <p>This folder doesn’t exist anymore.</p>
         <a className="btn primary" href="#/">
-          Go to My Drive
+          Go to My Files
         </a>
       </div>
     );
 
   const { folder, path, folders, items } = data;
-  const title = folder.id === ROOT ? 'My Drive' : folder.title;
+  const title = folder.id === ROOT ? 'My Files' : folder.title;
 
   return (
     <>
@@ -157,7 +157,7 @@ function Breadcrumbs({ path }: { path: Folder[] }) {
     <nav className="crumbs" aria-label="Folder path">
       {path.map((f, i) => {
         const last = i === path.length - 1;
-        const label = f.id === ROOT ? 'My Drive' : f.title;
+        const label = f.id === ROOT ? 'My Files' : f.title;
         return (
           <span key={f.id} className="crumb-wrap">
             {i > 0 && <Icon name="chevron" size={16} />}

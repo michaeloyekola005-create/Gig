@@ -82,7 +82,7 @@ export function Sidebar({ route, folderId }: { route: string[]; folderId: string
       <NewMenu folderId={folderId} />
       <nav className="nav">
         <a className={!inRecent ? 'on' : ''} href="#/">
-          <Icon name="drive" /> My Drive
+          <Icon name="home" /> My Files
         </a>
         <a className={inRecent ? 'on' : ''} href="#/recent">
           <Icon name="clock" /> Recent
@@ -103,7 +103,7 @@ export function TopBar({ query, onQuery, folderId }: { query: string; onQuery: (
       </a>
       <label className="search">
         <Icon name="search" size={18} />
-        <input placeholder="Search in Drive" value={query} onChange={(e) => onQuery(e.target.value)} />
+        <input placeholder="Search your files" value={query} onChange={(e) => onQuery(e.target.value)} />
         {query && (
           <button className="icon-btn small" onClick={() => onQuery('')} aria-label="Clear search">
             <Icon name="close" size={16} />

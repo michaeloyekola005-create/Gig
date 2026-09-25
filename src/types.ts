@@ -6,7 +6,7 @@ export const ROOT = 'root';
 export interface Folder {
   id: string;
   title: string;
-  parentId: string | null; // null only for the root ("My Drive")
+  parentId: string | null; // null only for the root ("My Files")
   layout: Layout;
   coverId: string | null; // item shown on the folder's card
   order: string[]; // file ids, in display order

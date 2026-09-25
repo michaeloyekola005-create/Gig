@@ -11,7 +11,7 @@ export function Dialog() {
       setValue(d.value);
       requestAnimationFrame(() => {
         input.current?.focus();
-        // Select the name without its extension, like Drive does.
+        // Select the name without its extension, so it is quick to retype.
         const dot = d.value.lastIndexOf('.');
         input.current?.setSelectionRange(0, dot > 0 ? dot : d.value.length);
       });

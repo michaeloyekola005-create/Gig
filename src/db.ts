@@ -23,7 +23,7 @@ function open(): Promise<IDBDatabase> {
       items.createIndex('folderId', 'folderId');
 
       if (e.oldVersion === 1) {
-        // v1 had flat "projects"; each becomes a folder in My Drive.
+        // v1 had flat "projects"; each becomes a folder in My Files.
         const folders = t.objectStore('folders');
         const rootOrder: string[] = [];
         t.objectStore('projects').openCursor().onsuccess = function () {
@@ -91,7 +91,7 @@ export function notifyChanged() {
 // --- folders --------------------------------------------------------------
 function newRoot(): Folder {
   return {
-    id: ROOT, title: 'My Drive', parentId: null, layout: 'grid', coverId: null,
+    id: ROOT, title: 'My Files', parentId: null, layout: 'grid', coverId: null,
     order: [], folderOrder: [], createdAt: 0, updatedAt: 0,
   };
 }

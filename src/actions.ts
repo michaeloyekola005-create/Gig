@@ -18,7 +18,7 @@ export async function createFolder(parentId: string, title = 'Untitled folder'):
 
 /**
  * Upload into a folder. Dropped folders are recreated (with their sub-folders),
- * just like dragging a folder into Drive.
+ * just as you arranged them on your computer.
  */
 export async function upload(dropped: DroppedFile[], parentId: string) {
   const files = dropped.filter((d) => !d.file.name.startsWith('.'));

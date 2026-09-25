@@ -1,9 +1,9 @@
 # Gig
 
-**Like Google Drive, but your work actually looks good.**
+**Store your files. See your work. Arrange it beautifully.**
 
-Gig works like Drive (folders, uploads, search), with three changes for designers
-and freelancers:
+Gig is a simple file manager (folders, uploads, search) made for designers and
+freelancers:
 
 1. **Easy arranging.** Drag files and folders into the order you want. Drop a file onto a
    folder (or onto a breadcrumb) to move it. Each folder remembers its own layout:
@@ -15,7 +15,7 @@ and freelancers:
 
 ## Features
 
-- **Upload like Drive.** Use **New → Upload files / Upload folder / New folder**, drag files
+- **Easy uploads.** Use **New → Upload files / Upload folder / New folder**, drag files
   or whole folders anywhere on the page, or paste screenshots with Ctrl/⌘ V. Dropped folders
   keep their sub-folders.
 - **Folders** show a preview of what's inside. Star a file to make it the folder's cover.

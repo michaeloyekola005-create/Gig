@@ -1,7 +1,7 @@
 {
-  "name": "Gig — a cleaner drive for freelancers",
+  "name": "Gig — files for freelancers, beautifully arranged",
   "short_name": "Gig",
-  "description": "Drive for designers: upload like Drive, arranged and clean.",
+  "description": "Store your design files and arrange them beautifully.",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#e3ecf8",
