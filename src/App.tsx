@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { Sidebar, TopBar } from './components/Chrome';
 import { Dialog } from './components/Dialog';
 import { FolderView } from './components/FolderView';
@@ -35,6 +36,7 @@ export function App() {
       <div className={`toast ${status ? 'on' : ''}`} role="status">
         {status}
       </div>
+      <Analytics />
     </div>
   );
 }
